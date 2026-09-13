@@ -2,6 +2,7 @@ import React from "react";
 import { useSettings } from "../components/SettingsContext";
 import type { NavPosition, ThemeMode } from "../core/types";
 import { SettingsIcon } from "../components/Icons";
+import { ToggleSwitch } from "../components/ToggleSwitch";
 
 const THEME_OPTIONS: { value: ThemeMode; label: string; swatch: string }[] = [
   { value: "system", label: "System", swatch: "swatch-system" },
@@ -14,19 +15,6 @@ const NAV_OPTIONS: { value: NavPosition; label: string; icon: string }[] = [
   { value: "right", label: "Right", icon: "nav-icon-right" },
   { value: "bottom", label: "Bottom", icon: "nav-icon-bottom" },
 ];
-
-function ToggleSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <button
-      className={"toggle-switch" + (on ? " on" : "")}
-      onClick={onToggle}
-      role="switch"
-      aria-checked={on}
-    >
-      <span className="toggle-switch-knob" />
-    </button>
-  );
-}
 
 export default function SettingsPage() {
   const { settings, updateSettings, loaded } = useSettings();
@@ -103,6 +91,21 @@ export default function SettingsPage() {
           <ToggleSwitch
             on={settings.showReviewTab}
             onToggle={() => updateSettings({ showReviewTab: !settings.showReviewTab })}
+          />
+        </div>
+
+        <div className="settings-row">
+          <div>
+            <div className="settings-row-label">Count new memories as reviewed</div>
+            <div className="settings-row-desc">
+              When on, adding a memory scores it a "Good" first review right
+              away instead of leaving it as Never Reviewed. Overridable per
+              memory in Quick Add.
+            </div>
+          </div>
+          <ToggleSwitch
+            on={settings.reviewOnAddDefault}
+            onToggle={() => updateSettings({ reviewOnAddDefault: !settings.reviewOnAddDefault })}
           />
         </div>
 

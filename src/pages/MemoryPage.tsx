@@ -11,12 +11,13 @@ import {
   newReviewLogId,
   getSettings,
 } from "../db/repository";
-import { formatRelative, parseRelativeDate, RELATIVE_DATE_PRESETS, isSameDay } from "../core/dates";
+import { formatRelative, parseRelativeDate, RELATIVE_DATE_PRESETS, isSameDay, startOfDay, addDays } from "../core/dates";
 import { CheckIcon, ChevronRight, PlusIcon, XIcon, SortIcon } from "../components/Icons";
 import { TagInput, invalidateTagCache } from "../components/TagInput";
 import { CardState, Rating as R } from "../core/types";
 import { schedule } from "../fsrs/engine";
 import { useSettings } from "../components/SettingsContext";
+import { ToggleSwitch } from "../components/ToggleSwitch";
 
 /** Record an FSRS rating for a memory directly from a library row (no
  * navigation to the Review page, no row expansion) — the same scheduling
@@ -90,6 +91,7 @@ function InlineRatingRow({
 }
 
 function QuickAdd({ onAdded }: { onAdded: () => void }) {
+  const { settings } = useSettings();
   const [content, setContent] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [learnedPreset, setLearnedPreset] = useState("today");
@@ -99,6 +101,7 @@ function QuickAdd({ onAdded }: { onAdded: () => void }) {
   const [tags, setTags] = useState("");
   const [collection, setCollection] = useState("");
   const [saving, setSaving] = useState(false);
+  const [reviewOnAdd, setReviewOnAdd] = useState(settings.reviewOnAddDefault);
 
   async function submit() {
     const trimmed = content.trim();
@@ -116,6 +119,7 @@ function QuickAdd({ onAdded }: { onAdded: () => void }) {
         .map((t) => t.trim())
         .filter(Boolean),
       collection: collection.trim() || undefined,
+      reviewOnAdd,
     });
     invalidateTagCache();
     setContent("");
@@ -125,6 +129,7 @@ function QuickAdd({ onAdded }: { onAdded: () => void }) {
     setCollection("");
     setCustomDate("");
     setLearnedPreset("today");
+    setReviewOnAdd(settings.reviewOnAddDefault);
     setExpanded(false);
     setSaving(false);
     onAdded();
@@ -200,6 +205,16 @@ function QuickAdd({ onAdded }: { onAdded: () => void }) {
             </div>
           </div>
 
+          <div className="flex-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <div className="field-label">Mark as reviewed</div>
+              <div className="settings-row-desc" style={{ fontSize: 12 }}>
+                Counts as an initial "Good" review instead of starting untouched.
+              </div>
+            </div>
+            <ToggleSwitch on={reviewOnAdd} onToggle={() => setReviewOnAdd((v) => !v)} />
+          </div>
+
           <div className="flex-row gap-8" style={{ justifyContent: "flex-end" }}>
             <button
               className="btn btn-text"
@@ -234,7 +249,11 @@ function MemoryRow({
   const [collection, setCollection] = useState(memory.collection ?? "");
   const [tags, setTags] = useState(memory.tags.join(", "));
 
-  const isDue = new Date(memory.card.due).getTime() <= Date.now();
+  // "Due" means due today or earlier (calendar day), matching the Schedule
+  // page's day-granularity — not a strict `due <= this exact instant` check,
+  // which would otherwise mislabel something due later today as not-yet-due.
+  const endOfToday = addDays(startOfDay(new Date()), 1);
+  const isDue = new Date(memory.card.due).getTime() < endOfToday.getTime();
   const isNew = memory.card.state === CardState.New;
   const reviewedToday =
     !isDue && !!memory.card.lastReview && isSameDay(new Date(memory.card.lastReview), new Date());
@@ -366,29 +385,46 @@ export default function MemoryPage() {
     return list;
   }, [memories, filter, sortOrder]);
 
-  // A memory belongs in "Today" if it's currently due, OR if it was already
-  // reviewed today — so rating it doesn't make it vanish from Today the
-  // instant you tap a rating; it stays visible (now as "reviewed") until the
-  // day rolls over.
+  // A memory belongs in "Today" if it's due today or earlier (calendar day —
+  // matching the Schedule page's day-granularity, not a strict `due <= this
+  // exact instant` check, which would otherwise leave something due later
+  // today stuck in the Library with a confusing "Review today" label), OR if
+  // it was already reviewed today, OR if it was marked complete today — none
+  // of those actions should make it vanish from Today the instant you tap
+  // something; it stays visible (as "reviewed" / done) until the day rolls
+  // over. A memory completed on an *earlier* day still drops out of Today as
+  // before, so Today doesn't accumulate stale completed items forever.
   const now = new Date();
-  const isDueNow = (m: Memory) => new Date(m.card.due).getTime() <= now.getTime();
+  const endOfToday = addDays(startOfDay(now), 1);
+  const isDueNow = (m: Memory) => new Date(m.card.due).getTime() < endOfToday.getTime();
   const reviewedToday = (m: Memory) =>
     !!m.card.lastReview && isSameDay(new Date(m.card.lastReview), now);
+  const completedToday = (m: Memory) =>
+    m.completed && !!m.completedAt && isSameDay(new Date(m.completedAt), now);
+  const staleCompleted = (m: Memory) => m.completed && !completedToday(m);
 
   const today = useMemo(
-    () => filtered.filter((m) => !m.completed && (isDueNow(m) || reviewedToday(m))),
+    () =>
+      filtered.filter(
+        (m) => !staleCompleted(m) && (isDueNow(m) || reviewedToday(m) || completedToday(m))
+      ),
     [filtered]
   );
-  const rest = useMemo(
-    () => filtered.filter((m) => m.completed || (!isDueNow(m) && !reviewedToday(m))),
-    [filtered]
-  );
+  const todayIds = useMemo(() => new Set(today.map((m) => m.id)), [today]);
+  const rest = useMemo(() => filtered.filter((m) => !todayIds.has(m.id)), [filtered, todayIds]);
 
-  // Within "Today", keep still-due items visually ahead of ones already
-  // reviewed today, with a thin divider between the two groups — so it's
-  // still one unified "Today" list, but you can tell at a glance what's left.
-  const todayStillDue = useMemo(() => today.filter((m) => isDueNow(m)), [today]);
-  const todayReviewed = useMemo(() => today.filter((m) => !isDueNow(m)), [today]);
+  // Within "Today", keep still-actionable items (due now, not yet handled)
+  // visually ahead of ones already reviewed or completed today, with a thin
+  // divider between the two groups — so it's still one unified "Today" list,
+  // but you can tell at a glance what's left to do.
+  const todayStillDue = useMemo(
+    () => today.filter((m) => isDueNow(m) && !m.completed),
+    [today]
+  );
+  const todayReviewed = useMemo(
+    () => today.filter((m) => !(isDueNow(m) && !m.completed)),
+    [today]
+  );
 
   return (
     <div>

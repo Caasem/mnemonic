@@ -1,6 +1,6 @@
 import { dbDelete, dbGet, dbGetAll, dbPut, STORES } from "./database";
-import { createNewCard } from "../fsrs/engine";
-import { DEFAULT_SETTINGS } from "../core/types";
+import { createNewCard, schedule } from "../fsrs/engine";
+import { DEFAULT_SETTINGS, Rating } from "../core/types";
 import type { Memory, ReviewLogEntry, Collection, Settings } from "../core/types";
 
 function uid(): string {
@@ -22,11 +22,18 @@ export interface QuickAddInput {
   collection?: string;
   parentId?: string;
   type?: string;
+  // If set, overrides settings.reviewOnAddDefault for this memory only.
+  // When true, the memory is immediately scored a "Good" first review
+  // (timestamped to its learned date, not the moment of adding) instead of
+  // starting untouched in the "New" state.
+  reviewOnAdd?: boolean;
 }
 
 export async function createMemory(input: QuickAddInput): Promise<Memory> {
   const now = new Date();
   const nowIso = now.toISOString();
+  const learnedAt = input.learnedAt ?? nowIso;
+
   const memory: Memory = {
     id: newMemoryId(),
     content: input.content.trim(),
@@ -37,13 +44,41 @@ export async function createMemory(input: QuickAddInput): Promise<Memory> {
     parentId: input.parentId || undefined,
     type: input.type?.trim() || undefined,
     createdAt: nowIso,
-    learnedAt: input.learnedAt ?? nowIso,
+    learnedAt,
     updatedAt: nowIso,
     completed: false,
     archived: false,
     deleted: false,
     card: createNewCard(now),
   };
+
+  const settings = await getSettings();
+  const reviewOnAdd = input.reviewOnAdd ?? settings.reviewOnAddDefault;
+
+  if (reviewOnAdd) {
+    // Score the initial review as of the learned date (which may be
+    // backdated), not "right now" — consistent with the app's retrospective
+    // dating everywhere else, and it keeps the resulting due date accurate
+    // relative to when the memory was actually learned.
+    const reviewTime = new Date(learnedAt);
+    const result = schedule(memory.card, Rating.Good, reviewTime, settings);
+    memory.card = result.card;
+    await appendReviewLog({
+      id: newReviewLogId(),
+      memoryId: memory.id,
+      rating: Rating.Good,
+      state: result.card.state,
+      due: result.card.due,
+      stability: result.card.stability,
+      difficulty: result.card.difficulty,
+      elapsedDays: result.logPreview.elapsedDays,
+      lastElapsedDays: result.logPreview.lastElapsedDays,
+      scheduledDays: result.logPreview.scheduledDays,
+      reviewedAt: reviewTime.toISOString(),
+      reviewAhead: false,
+    });
+  }
+
   await dbPut(STORES.memories, memory);
   if (memory.collection) await ensureCollection(memory.collection);
   return memory;

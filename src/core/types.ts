@@ -95,6 +95,10 @@ export interface Settings {
   showReviewTab: boolean; // hide/show the dedicated Review tab from main nav
   memorySortOrder: MemorySortOrder;
   navPosition: NavPosition; // where the main nav bar sits on wide screens
+  reviewOnAddDefault: boolean; // if true, newly-added memories are auto-scored
+  // a "Good" first review (timestamped to their learned date) instead of
+  // starting untouched as "Never reviewed" — the Quick Add form can override
+  // this per memory.
   seeded: boolean; // whether demo data has already been seeded once
 }
 
@@ -112,5 +116,6 @@ export const DEFAULT_SETTINGS: Settings = {
   showReviewTab: true,
   memorySortOrder: "entryOrder",
   navPosition: "left",
+  reviewOnAddDefault: true,
   seeded: false,
 };
