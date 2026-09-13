@@ -11,7 +11,7 @@ import {
   newReviewLogId,
   getSettings,
 } from "../db/repository";
-import { formatRelative, parseRelativeDate, RELATIVE_DATE_PRESETS } from "../core/dates";
+import { formatRelative, parseRelativeDate, RELATIVE_DATE_PRESETS, isSameDay } from "../core/dates";
 import { CheckIcon, ChevronRight, PlusIcon, XIcon, SortIcon } from "../components/Icons";
 import { TagInput, invalidateTagCache } from "../components/TagInput";
 import { CardState, Rating as R } from "../core/types";
@@ -236,6 +236,8 @@ function MemoryRow({
 
   const isDue = new Date(memory.card.due).getTime() <= Date.now();
   const isNew = memory.card.state === CardState.New;
+  const reviewedToday =
+    !isDue && !!memory.card.lastReview && isSameDay(new Date(memory.card.lastReview), new Date());
 
   async function saveEdits() {
     await updateMemory(memory.id, {
@@ -270,7 +272,10 @@ function MemoryRow({
             {memory.collection && <span>{memory.collection}</span>}
             {memory.tags.length > 0 && <span>{memory.tags.join(", ")}</span>}
             <span>Learned {formatRelative(memory.learnedAt)}</span>
-            {!isNew && (
+            {!isNew && reviewedToday && (
+              <span className="badge badge-reviewed">Reviewed today</span>
+            )}
+            {!isNew && !reviewedToday && (
               <span className={"badge" + (isDue ? " due" : "")}>
                 {isDue ? "Review due" : `Review ${formatRelative(memory.card.due)}`}
               </span>
@@ -361,14 +366,29 @@ export default function MemoryPage() {
     return list;
   }, [memories, filter, sortOrder]);
 
+  // A memory belongs in "Today" if it's currently due, OR if it was already
+  // reviewed today — so rating it doesn't make it vanish from Today the
+  // instant you tap a rating; it stays visible (now as "reviewed") until the
+  // day rolls over.
+  const now = new Date();
+  const isDueNow = (m: Memory) => new Date(m.card.due).getTime() <= now.getTime();
+  const reviewedToday = (m: Memory) =>
+    !!m.card.lastReview && isSameDay(new Date(m.card.lastReview), now);
+
   const today = useMemo(
-    () => filtered.filter((m) => !m.completed && new Date(m.card.due).getTime() <= Date.now()),
+    () => filtered.filter((m) => !m.completed && (isDueNow(m) || reviewedToday(m))),
     [filtered]
   );
   const rest = useMemo(
-    () => filtered.filter((m) => m.completed || new Date(m.card.due).getTime() > Date.now()),
+    () => filtered.filter((m) => m.completed || (!isDueNow(m) && !reviewedToday(m))),
     [filtered]
   );
+
+  // Within "Today", keep still-due items visually ahead of ones already
+  // reviewed today, with a thin divider between the two groups — so it's
+  // still one unified "Today" list, but you can tell at a glance what's left.
+  const todayStillDue = useMemo(() => today.filter((m) => isDueNow(m)), [today]);
+  const todayReviewed = useMemo(() => today.filter((m) => !isDueNow(m)), [today]);
 
   return (
     <div>
@@ -420,7 +440,13 @@ export default function MemoryPage() {
         <>
           <div className="grouped-list-header">Today</div>
           <div className="grouped-list">
-            {today.map((m) => (
+            {todayStillDue.map((m) => (
+              <MemoryRow key={m.id} memory={m} onChanged={refresh} />
+            ))}
+            {todayStillDue.length > 0 && todayReviewed.length > 0 && (
+              <div className="today-divider" />
+            )}
+            {todayReviewed.map((m) => (
               <MemoryRow key={m.id} memory={m} onChanged={refresh} />
             ))}
           </div>

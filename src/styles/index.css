@@ -534,6 +534,18 @@ a {
   font-weight: 500;
 }
 
+.today-divider {
+  height: 1px;
+  margin: 4px 16px;
+  background: var(--separator);
+}
+
+.badge-reviewed {
+  background: transparent;
+  border: 1px solid var(--separator);
+  color: var(--label-secondary);
+}
+
 .badge.due {
   background: var(--label);
   color: var(--bg-elevated);
