@@ -8,6 +8,7 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; swatch: string }[] = [
   { value: "system", label: "System", swatch: "swatch-system" },
   { value: "light", label: "Light", swatch: "swatch-light" },
   { value: "dark", label: "Dark", swatch: "swatch-dark" },
+  { value: "warm", label: "Warm", swatch: "swatch-warm" },
 ];
 
 const NAV_OPTIONS: { value: NavPosition; label: string; icon: string }[] = [

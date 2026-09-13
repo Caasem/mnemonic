@@ -77,7 +77,7 @@ export interface Collection {
   createdAt: string;
 }
 
-export type ThemeMode = "system" | "light" | "dark";
+export type ThemeMode = "system" | "light" | "dark" | "warm";
 export type MemorySortOrder = "dueDate" | "entryOrder";
 export type NavPosition = "left" | "right" | "bottom";
 

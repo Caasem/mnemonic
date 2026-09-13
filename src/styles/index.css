@@ -2,6 +2,7 @@
    Mobile-first, fully responsive from phone through tablet to desktop. */
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600&display=swap");
 
 :root {
   color-scheme: light dark;
@@ -535,8 +536,8 @@ a {
 }
 
 .today-divider {
-  height: 1px;
-  margin: 4px 16px;
+  height: 0.5px;
+  margin: 0;
   background: var(--separator);
 }
 
@@ -1193,6 +1194,91 @@ table.matrix-table {
 .theme-swatch.swatch-system {
   background: linear-gradient(135deg, #ffffff 50%, #1c1c1e 50%);
 }
+
+.theme-swatch.swatch-warm { background: #faf6ef; }
+.theme-swatch.swatch-warm::after { background: linear-gradient(180deg, #f0e6d4 0 30%, transparent 30%); }
+
+/* ---------- Warm Editorial theme ---------- */
+/* A simple, toggleable alternate theme: cream background, serif headlines
+   over the existing sans body, hairline rows instead of elevated cards, and
+   letter-style (outlined + initial) rating buttons instead of solid dots.
+   Scoped entirely under [data-theme="warm"] so it never touches the default
+   monochrome look. */
+
+:root[data-theme="warm"] {
+  --bg: #faf6ef;
+  --bg-elevated: #faf6ef;
+  --bg-grouped: #faf6ef;
+  --bg-secondary: #f3ecdd;
+  --bg-tertiary: #efe6d2;
+  --bg-pressed: #efe6d2;
+
+  --label: #2b2620;
+  --label-secondary: #8a7f6e;
+  --label-tertiary: rgba(138, 127, 110, 0.6);
+  --label-quaternary: rgba(138, 127, 110, 0.35);
+
+  --separator: #e6ddc9;
+  --separator-opaque: #e6ddc9;
+
+  --accent: #8a4a2f;
+  --accent-contrast: #ffffff;
+
+  --font-serif: "Source Serif 4", Georgia, serif;
+}
+
+:root[data-theme="warm"] .nav-title-large,
+:root[data-theme="warm"] .memory-row-title,
+:root[data-theme="warm"] .settings-hero-title {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Hairline rows instead of elevated cards */
+:root[data-theme="warm"] .grouped-list,
+:root[data-theme="warm"] .quick-add {
+  background: transparent;
+  border: none;
+  border-top: 0.5px solid var(--separator);
+  border-radius: 0;
+}
+
+:root[data-theme="warm"] .list-row {
+  border-bottom: 0.5px solid var(--separator);
+}
+
+:root[data-theme="warm"] .today-divider {
+  background: var(--separator);
+}
+
+/* Letter-style rating buttons: outlined circles with an initial letter
+   instead of solid color dots. */
+:root[data-theme="warm"] .rating-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: transparent !important;
+  border: 1px solid var(--label-secondary);
+  opacity: 1;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+:root[data-theme="warm"] .rating-dot.again { color: #8a4a2f; }
+:root[data-theme="warm"] .rating-dot.hard { color: #946a34; }
+:root[data-theme="warm"] .rating-dot.good { color: #5c7248; }
+:root[data-theme="warm"] .rating-dot.easy { color: #4e6a7a; }
+
+:root[data-theme="warm"] .rating-dot.again::before { content: "A"; }
+:root[data-theme="warm"] .rating-dot.hard::before { content: "H"; }
+:root[data-theme="warm"] .rating-dot.good::before { content: "G"; }
+:root[data-theme="warm"] .rating-dot.easy::before { content: "E"; }
 
 .theme-option-label {
   font-size: 12px;
